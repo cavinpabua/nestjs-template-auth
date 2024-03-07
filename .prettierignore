@@ -1,0 +1,9 @@
+dist
+libs
+node_modules
+static
+.husky
+.github
+.circleci
+.vscode
+*.log
