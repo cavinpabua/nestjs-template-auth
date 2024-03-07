@@ -46,17 +46,14 @@ export class AuthController {
 
   @ApiResponse({ status: 200 })
   @ApiBearerAuth('access-token')
-  @UseGuards(JwtAuthGuard)
   @Get('logout')
-  async logOut(@Request() req: { user: PayloadToken }) {
+  async logout(@Request() req: { user: PayloadToken }) {
     await this.authService.logout(req.user);
   }
 
-  // Update password
   @ApiBody({ type: UpdatePasswordDto })
   @ApiResponse({ status: 200 })
   @ApiBearerAuth('access-token')
-  @UseGuards(JwtAuthGuard)
   @Patch('password')
   async updatePassword(
     @Req() req: AuthorizedRequest,
