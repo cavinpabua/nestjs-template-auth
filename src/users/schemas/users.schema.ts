@@ -9,7 +9,7 @@ import { Gender } from '@/users/domain/types';
   optimisticConcurrency: true,
 })
 export class Users {
-  @Prop({ type: String, required: true })
+  @Prop({ type: String, required: true, unique: true })
   email: string;
 
   @Prop({ type: String, required: false })
@@ -24,7 +24,7 @@ export class Users {
   @Prop({ type: String, required: true })
   password: string;
 
-  @Prop({ type: String, required: true })
+  @Prop({ type: String, required: true, default: Role.USER })
   role: Role;
 
   @Prop({ type: String, required: false })

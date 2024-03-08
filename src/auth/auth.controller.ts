@@ -8,6 +8,7 @@ import {
   Req,
   Request,
   UseGuards,
+  UsePipes,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
@@ -16,12 +17,14 @@ import {
   PostLoginResponse,
 } from '@/auth/dto/login.dto';
 import { UpdatePasswordDto } from '@/auth/dto/update-password.dto';
-import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import JwtRefreshGuard from '@/auth/guards/jwt-refresh.guard';
 import { PayloadToken } from '@/auth/domain/types';
 import { AuthService } from '@/auth/auth.service';
 import { Public } from '@/internal/common/decorators/public.decorator';
 import { LocalAuthGuard } from '@/auth/guards/local-auth.guard';
+import { IsApiKeyOnly } from '@/internal/common/decorators/api-key-only.decorator';
+import { CreateUserDto } from '@/users/dto/create-user.dto';
+import { ValidationTransformPipe } from '@/internal/common/pipes/validation-transform.pipe';
 
 type AuthorizedRequest = Express.Request & {
   headers: { authorization: string };
@@ -29,9 +32,17 @@ type AuthorizedRequest = Express.Request & {
 };
 
 @ApiTags('auth')
-@Controller('auth')
+@Controller({ path: 'auth', version: '1' })
 export class AuthController {
   constructor(private authService: AuthService) {}
+
+  @ApiBody({ type: CreateUserDto })
+  @IsApiKeyOnly()
+  @UsePipes(ValidationTransformPipe)
+  @Post('create-admin')
+  createAdmin(@Body() dto: CreateUserDto) {
+    return this.authService.createAdmin(dto);
+  }
 
   @ApiBody({ type: LoginDto })
   @ApiResponse({ type: PostLoginResponse, status: 200 })
@@ -46,9 +57,9 @@ export class AuthController {
 
   @ApiResponse({ status: 200 })
   @ApiBearerAuth('access-token')
-  @Get('logout')
+  @Post('logout')
   async logout(@Request() req: { user: PayloadToken }) {
-    await this.authService.logout(req.user);
+    return await this.authService.logout(req.user);
   }
 
   @ApiBody({ type: UpdatePasswordDto })
@@ -69,8 +80,10 @@ export class AuthController {
   @ApiResponse({ status: 200, type: GetRefreshResponse })
   @ApiBearerAuth('refresh-token')
   @UseGuards(JwtRefreshGuard)
-  @Get('refresh')
-  refresh(@Req() req: AuthorizedRequest) {
-    return this.authService.createAccessTokenFromRefreshToken(req.user);
+  @Public()
+  @Post('refresh')
+  refresh(@Request() req: AuthorizedRequest) {
+    const token = req.headers.authorization;
+    return this.authService.createAccessTokenFromRefreshToken(token);
   }
 }

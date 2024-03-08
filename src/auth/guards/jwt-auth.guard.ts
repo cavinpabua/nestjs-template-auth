@@ -8,6 +8,7 @@ import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import * as jwt from 'jsonwebtoken';
 import { IS_PUBLIC_KEY } from '@/internal/common/decorators/public.decorator';
+import { API_KEY_PREFIX } from '@/auth/constants/keys';
 
 const HTTP_STATUS_TOKEN_EXPIRED = 498;
 
@@ -20,6 +21,12 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   canActivate(context: ExecutionContext) {
     const isPublic = this.reflector.get(IS_PUBLIC_KEY, context.getHandler());
     if (isPublic) {
+      return true;
+    }
+    const request = context.switchToHttp().getRequest();
+    const authorization: string =
+      request.query?.apiKey || request.headers.authorization;
+    if (authorization?.toLowerCase()?.startsWith(API_KEY_PREFIX)) {
       return true;
     }
     return super.canActivate(context);

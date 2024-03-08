@@ -14,21 +14,20 @@ import { UsersDocument } from '@/users/schemas/users.schema';
 export class UsersService {
   constructor(private readonly repository: UsersRepository) {}
 
-  async create(createSurvivorDto: CreateUserDto): Promise<UsersDocument> {
+  async create(dto: CreateUserDto): Promise<UsersDocument> {
     const user = await this.repository.first({
-      email: createSurvivorDto.email,
+      email: dto.email,
     });
 
     if (user) {
       throw new BadRequestException('Email already exists');
     }
 
-    return await this.repository.store(createSurvivorDto);
+    return await this.repository.store(dto);
   }
 
   async findByEmailAndGetPassword(email: string) {
     return await this.repository.first({
-      select: ['id', 'password', 'role'],
       email,
     });
   }

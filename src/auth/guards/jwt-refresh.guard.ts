@@ -20,7 +20,6 @@ export default class JwtRefreshGuard extends AuthGuard('jwt-refresh-token') {
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest();
     const refreshToken = this.extractRefreshToken(request);
-
     if (!refreshToken) {
       throw new UnauthorizedException('No refresh token provided');
     }

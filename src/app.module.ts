@@ -5,6 +5,8 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '@/auth/auth.module';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
+import { WalletModule } from '@/wallet/wallet.module';
+import { ApiKeysGuard } from '@/auth/guards/api-key.guard';
 
 @Module({
   imports: [
@@ -20,9 +22,14 @@ import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
     }),
 
     AuthModule,
+    WalletModule,
   ],
   controllers: [],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ApiKeysGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

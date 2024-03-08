@@ -1,28 +1,37 @@
 import { Inject, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { PayloadToken } from '@/auth/domain/types';
+import { PayloadToken, Role } from '@/auth/domain/types';
 import { UsersService } from '@/users/users.service';
 import { UsersDocument } from '@/users/schemas/users.schema';
 import { SchemaId } from '@/internal/types/helpers';
-import { createHash } from 'crypto';
 import { RefreshTokenRepository } from '@/auth/repositories/refresh-token.repository';
 import { RefreshTokensDocument } from '@/auth/schemas/refresh-token.schema';
+import { ApiKeyRepository } from '@/auth/repositories/api-key.repository';
+import { CreateUserDto } from '@/users/dto/create-user.dto';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthService {
   constructor(
     private usersService: UsersService,
+    private jwtService: JwtService,
     @Inject('JWT_SIGNER') private readonly jwtSigner: (payload: any) => string,
     private readonly refreshTokenRepository: RefreshTokenRepository,
+    private readonly apiKeyRepository: ApiKeyRepository,
+    private configService: ConfigService,
   ) {}
+
+  async createAdmin(dto: CreateUserDto) {
+    dto.role = Role.ADMIN;
+    return await this.usersService.create(dto);
+  }
 
   async validateUser(email: string, password: string) {
     const user: UsersDocument =
       await this.usersService.findByEmailAndGetPassword(email);
-
     if (user) {
       const isMatch = await bcrypt.compare(password, user.password);
-
       if (isMatch) {
         delete user.password;
         return user;
@@ -32,8 +41,6 @@ export class AuthService {
   }
 
   async setCurrentRefreshToken(refreshToken: string, userId: SchemaId) {
-    const hash = createHash('sha256').update(refreshToken).digest('hex');
-    const currentHashedRefreshToken = await bcrypt.hashSync(hash, 10);
     const token: RefreshTokensDocument =
       await this.refreshTokenRepository.first({
         userId,
@@ -41,25 +48,23 @@ export class AuthService {
 
     if (token) {
       return await this.refreshTokenRepository.update(token._id, {
-        refreshToken: currentHashedRefreshToken,
+        token: refreshToken,
         isValid: true,
       });
     } else {
       return await this.refreshTokenRepository.store({
         userId,
-        refreshToken: currentHashedRefreshToken,
+        token: refreshToken,
       });
     }
   }
 
   async checkIfRefreshTokenValid(refreshToken: string) {
-    const hash = createHash('sha256').update(refreshToken).digest('hex');
-    const currentHashedRefreshToken = await bcrypt.hashSync(hash, 10);
     const token: RefreshTokensDocument =
       await this.refreshTokenRepository.first({
-        refreshToken: currentHashedRefreshToken,
+        token: refreshToken,
       });
-    return token.isValid;
+    return token?.isValid;
   }
 
   async login(user: PayloadToken) {
@@ -76,7 +81,17 @@ export class AuthService {
   jwtToken(user: PayloadToken) {
     const payload: PayloadToken = { role: user.role, _id: user._id };
     return {
-      accessToken: this.jwtSigner(payload),
+      accessToken: this.jwtService.sign(payload),
+    };
+  }
+
+  jwtTokenFromRefreshToken(token: string) {
+    const decoded = this.jwtService.verify(token, {
+      secret: this.configService.get<string>('jwt.jwtRefreshSecret'),
+    });
+    const payload: PayloadToken = { role: decoded.role, _id: decoded._id };
+    return {
+      accessToken: this.jwtService.sign(payload),
     };
   }
 
@@ -88,7 +103,7 @@ export class AuthService {
   async removeRefreshToken(userId: SchemaId) {
     const token: RefreshTokensDocument =
       await this.refreshTokenRepository.first({ userId });
-    return this.refreshTokenRepository.delete(token._id);
+    return this.refreshTokenRepository.update(token._id, { isValid: false });
   }
 
   async logout(user: PayloadToken) {
@@ -107,7 +122,18 @@ export class AuthService {
     );
   }
 
-  async createAccessTokenFromRefreshToken(user: PayloadToken) {
-    return this.jwtToken(user);
+  private extractRefreshToken(authHeader: string): string | null {
+    if (authHeader && authHeader.split(' ')[0] === 'Bearer') {
+      return authHeader.split(' ')[1];
+    }
+    return null;
+  }
+
+  async createAccessTokenFromRefreshToken(token: string) {
+    return this.jwtTokenFromRefreshToken(this.extractRefreshToken(token));
+  }
+
+  async validateApiKey(key: string) {
+    return await this.apiKeyRepository.first({ key, isValid: true });
   }
 }

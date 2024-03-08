@@ -7,10 +7,13 @@ import { HydratedDocument } from 'mongoose';
 })
 export class RefreshTokens {
   @Prop({ type: String, required: true })
+  userId: string;
+
+  @Prop({ type: String, required: true })
   token: string;
 
-  @Prop({ type: Boolean, required: true })
-  isValid: boolean;
+  @Prop({ type: Boolean, required: false, default: true })
+  isValid?: boolean;
 }
 
 export type RefreshTokensDocument = HydratedDocument<RefreshTokens>;
